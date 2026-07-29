@@ -1,0 +1,26 @@
+# Baseline pre-commit hooks for app-repo. Run `pre-commit install` once locally.
+# Deeper security scanning (dependency audit, container/IaC scanning) is layered
+# on in the CI hardening phase; this config keeps the local loop fast.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+
+  # Catch committed secrets before they ever hit history.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # Lint Dockerfiles for both services.
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.13.1-beta
+    hooks:
+      - id: hadolint-docker
+        files: (^|/)Dockerfile$

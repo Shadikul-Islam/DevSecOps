@@ -1,0 +1,19 @@
+{
+  "name": "worker-service",
+  "version": "0.1.0",
+  "description": "Phase 0 worker service — polls records table, processes pending rows (app-repo)",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "8.13.1",
+    "pino": "9.6.0",
+    "prom-client": "15.1.3"
+  }
+}

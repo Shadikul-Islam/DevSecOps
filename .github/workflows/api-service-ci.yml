@@ -1,0 +1,40 @@
+name: api-service-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api-service/**"
+      - ".github/workflows/api-service-ci.yml"
+  pull_request:
+    paths:
+      - "api-service/**"
+      - ".github/workflows/api-service-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: api-service/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Syntax check sources
+        run: node --check src/index.js && node --check src/app.js
+
+      - name: Build Docker image
+        run: docker build -t api-service:ci .
