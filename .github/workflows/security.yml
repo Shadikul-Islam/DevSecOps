@@ -1,0 +1,45 @@
+name: security
+
+# No `paths:` filter on purpose. Secrets can land in any file, and this job is
+# meant to become a required status check — a filtered workflow that never runs
+# leaves such a check permanently pending on unrelated PRs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Keep in step with the version developers run locally via .pre-commit-config.yaml,
+      # so a scan that passes on a workstation passes here for the same reasons.
+      GITLEAKS_VERSION: 8.24.3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: gitleaks scans commits, and the default shallow clone
+          # would hand it a single commit and still report "no leaks found".
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -sSL --fail \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks version
+
+      # --redact is mandatory here: run logs are visible to anyone with read
+      # access and are retained, so an unredacted finding would spread the secret
+      # further than the commit did.
+      - name: Scan git history for secrets
+        run: ./gitleaks git --redact --verbose --exit-code 1
