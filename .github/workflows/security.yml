@@ -10,6 +10,9 @@ on:
 
 permissions:
   contents: read
+  # Needed to publish findings as code scanning alerts. Nothing else is granted;
+  # the default token scope is far wider than this job needs.
+  security-events: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,18 +26,28 @@ jobs:
       # Keep in step with the version developers run locally via .pre-commit-config.yaml,
       # so a scan that passes on a workstation passes here for the same reasons.
       GITLEAKS_VERSION: 8.24.3
+      GITLEAKS_SHA256: 9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to commit SHAs, not tags: a tag can be repointed at
+      # different code without anything changing in this repo. Renovate proposes
+      # SHA bumps as reviewable PRs.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Full history: gitleaks scans commits, and the default shallow clone
-          # would hand it a single commit and still report "no leaks found".
+          # hides a secret that was committed and later deleted — the file is
+          # gone from the tree, the secret is still in history, scan reports clean.
           fetch-depth: 0
 
       - name: Install gitleaks
         run: |
+          set -euo pipefail
           curl -sSL --fail \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             -o gitleaks.tar.gz
+          # Fail closed if the asset is not byte-for-byte what we pinned: this
+          # binary runs unsandboxed in CI, so an unverified download is a direct
+          # path into the pipeline.
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict -
           tar -xzf gitleaks.tar.gz gitleaks
           ./gitleaks version
 
@@ -42,4 +55,20 @@ jobs:
       # access and are retained, so an unredacted finding would spread the secret
       # further than the commit did.
       - name: Scan git history for secrets
-        run: ./gitleaks git --redact --verbose --exit-code 1
+        run: |
+          ./gitleaks git \
+            --redact \
+            --verbose \
+            --exit-code 1 \
+            --report-format sarif \
+            --report-path gitleaks.sarif
+
+      # `always()` because the step above exits non-zero exactly when there is
+      # something worth publishing — without it, findings would only ever be
+      # uploaded on clean runs.
+      - name: Upload findings to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@c4dd10e44af883a891fe31ced449bcb4a6728b9b # v3.37.6
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
