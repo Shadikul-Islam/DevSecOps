@@ -26,6 +26,14 @@ jobs:
   # cheapest to wire now, before that is true.
   secret-scan:
     uses: ./.github/workflows/security.yml
+    # Granted on this job alone, not workflow-wide, so `build` keeps the
+    # top-level `contents: read`. A called workflow that declares more than the
+    # caller grants fails the run before any job starts, so this is required
+    # even though `skip_upload` below means the permission goes unused —
+    # the check is static, against what security.yml declares.
+    permissions:
+      contents: read
+      security-events: write
     with:
       # The standalone `security` run already publishes this commit's SARIF.
       # Two uploads under one category for the same commit read as competing
