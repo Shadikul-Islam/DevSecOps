@@ -1,7 +1,7 @@
 {
   "name": "app-repo",
   "version": "0.1.0",
-  "description": "app-repo (1 of 4) — Phase 0 minimal microservices for the DevSecOps portfolio project",
+  "description": "app-repo (1 of 4) — application services and their security pipeline, part of a DevSecOps platform build",
   "private": true,
   "scripts": {
     "test:e2e": "npm --prefix tests run test:e2e"
