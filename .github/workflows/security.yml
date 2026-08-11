@@ -7,6 +7,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Callable from the per-service workflows, so a build never starts on a commit
+  # this scan has already rejected.
+  workflow_call:
+    inputs:
+      skip_upload:
+        description: Skip publishing SARIF; set by callers whose commit the standalone run already reports on.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -66,8 +74,10 @@ jobs:
       # `always()` because the step above exits non-zero exactly when there is
       # something worth publishing — without it, findings would only ever be
       # uploaded on clean runs.
+      # `inputs` is empty on push/pull_request, so the negation leaves the
+      # standalone run uploading as before; only an explicit caller opts out.
       - name: Upload findings to code scanning
-        if: always()
+        if: always() && !inputs.skip_upload
         uses: github/codeql-action/upload-sarif@c4dd10e44af883a891fe31ced449bcb4a6728b9b # v3.37.6
         with:
           sarif_file: gitleaks.sarif

@@ -6,16 +6,42 @@ on:
     paths:
       - "api-service/**"
       - ".github/workflows/api-service-ci.yml"
+      # This workflow now calls security.yml, so a change there changes what
+      # runs here.
+      - ".github/workflows/security.yml"
   pull_request:
     paths:
       - "api-service/**"
       - ".github/workflows/api-service-ci.yml"
+      # This workflow now calls security.yml, so a change there changes what
+      # runs here.
+      - ".github/workflows/security.yml"
 
 permissions:
   contents: read
 
 jobs:
+  # Gate. The image built below goes nowhere today, but once it is pushed to a
+  # registry a leaked commit becomes a published artifact — the dependency is
+  # cheapest to wire now, before that is true.
+  secret-scan:
+    uses: ./.github/workflows/security.yml
+    # Granted on this job alone, not workflow-wide, so `build` keeps the
+    # top-level `contents: read`. A called workflow that declares more than the
+    # caller grants fails the run before any job starts, so this is required
+    # even though `skip_upload` below means the permission goes unused —
+    # the check is static, against what security.yml declares.
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      # The standalone `security` run already publishes this commit's SARIF.
+      # Two uploads under one category for the same commit read as competing
+      # analyses of the same tool, and the alert list flip-flops between them.
+      skip_upload: true
+
   build:
+    needs: secret-scan
     runs-on: ubuntu-latest
     defaults:
       run:
